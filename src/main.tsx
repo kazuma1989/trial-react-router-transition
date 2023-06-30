@@ -63,7 +63,10 @@ const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(
           onClick?.(event)
           if (!event.defaultPrevented) {
             event.preventDefault()
-            handleClick(event)
+            // @ts-expect-error startViewTransition を実験的に使いたい
+            document.startViewTransition(() => {
+              handleClick(event)
+            })
           }
         }}
         ref={ref}
