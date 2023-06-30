@@ -1,10 +1,11 @@
-import React, { useContext, useMemo } from 'react'
+import { BrowserHistory, createBrowserHistory } from 'history'
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import {
-  BrowserRouter,
+  BrowserRouterProps,
   Link,
-  UNSAFE_NavigationContext as NavigationContext,
   Route,
+  Router,
   Routes,
 } from 'react-router-dom'
 import App from './App.tsx'
@@ -13,88 +14,80 @@ import './index.css'
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <BrowserRouter>
-      <MyRouter>
-        <Routes>
-          <Route
-            path="/a"
-            element={
-              <Layout>
-                <h1>/a</h1>
-              </Layout>
-            }
-          />
+      <Routes>
+        <Route
+          path="/a"
+          element={
+            <Layout>
+              <h1>/a</h1>
+            </Layout>
+          }
+        />
 
-          <Route
-            path="/b"
-            element={
-              <Layout>
-                <h1>/b</h1>
-              </Layout>
-            }
-          />
+        <Route
+          path="/b"
+          element={
+            <Layout>
+              <h1>/b</h1>
+            </Layout>
+          }
+        />
 
-          <Route
-            path="*"
-            element={
-              <Layout>
-                <App />
-              </Layout>
-            }
-          />
-        </Routes>
-      </MyRouter>
+        <Route
+          path="*"
+          element={
+            <Layout>
+              <App />
+            </Layout>
+          }
+        />
+      </Routes>
     </BrowserRouter>
   </React.StrictMode>
 )
 
-// // これはうまくいかない
-// const pushState = window.history.pushState.bind(window.history)
+/**
+ * @see https://github.com/remix-run/react-router/blob/382c792ad8feb9a4d77a8046143982ba8bd0714f/packages/react-router-dom/index.tsx#L143-L173
+ */
+function BrowserRouter({ basename, children, window }: BrowserRouterProps) {
+  const historyRef = useRef<BrowserHistory>()
+  if (historyRef.current == null) {
+    historyRef.current = createBrowserHistory({ window })
+  }
 
-// window.history.pushState = (...args) => {
-//   // @ts-expect-error startViewTransition を実験的に使いたい
-//   document.startViewTransition(() => {
-//     pushState(...args)
-//   })
-// }
+  const history = historyRef.current
+  const [state, setStateOriginal] = useState({
+    action: history.action,
+    location: history.location,
+  })
 
-function MyRouter({ children }: { children: React.ReactNode }) {
-  const original = useContext(NavigationContext)
-
-  const hookedNavigation = useMemo(() => {
-    // @ts-expect-error startViewTransition を実験的に使いたい
-    if (typeof document.startViewTransition !== 'function') {
-      return original
+  const setState: typeof setStateOriginal = useMemo(() => {
+    if (
+      !('startViewTransition' in document) ||
+      typeof document.startViewTransition !== 'function'
+    ) {
+      return setStateOriginal
     }
 
-    const navigator = new Proxy(original.navigator, {
-      get(target, propertyKey: keyof typeof original.navigator, receiver) {
-        if (propertyKey !== 'push') {
-          return Reflect.get(target, propertyKey, receiver)
-        }
+    const startViewTransition = document.startViewTransition.bind(document)
 
-        const originalPush = Reflect.get(target, propertyKey, receiver)
-
-        const newPush: typeof originalPush = (...args) => {
-          // @ts-expect-error startViewTransition を実験的に使いたい
-          document.startViewTransition(() => {
-            originalPush(...args)
-          })
-        }
-
-        return newPush
-      },
-    })
-
-    return {
-      ...original,
-      navigator,
+    return (...args) => {
+      startViewTransition(() => {
+        setStateOriginal(...args)
+      })
     }
-  }, [original])
+  }, [])
+
+  useLayoutEffect(() => history.listen(setState), [history, setState])
 
   return (
-    <NavigationContext.Provider value={hookedNavigation}>
-      {children}
-    </NavigationContext.Provider>
+    <Router
+      basename={basename}
+      children={children}
+      location={state.location}
+      navigationType={state.action}
+      navigator={history}
+    />
   )
 }
 
