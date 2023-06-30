@@ -62,6 +62,7 @@ const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(
         onClick={(event) => {
           onClick?.(event)
           if (!event.defaultPrevented) {
+            event.preventDefault()
             handleClick(event)
           }
         }}
