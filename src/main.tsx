@@ -1,6 +1,13 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
+import {
+  BrowserRouter,
+  LinkProps,
+  Route,
+  Routes,
+  useHref,
+  useLinkClickHandler,
+} from 'react-router-dom'
 import App from './App.tsx'
 import './index.css'
 
@@ -37,6 +44,32 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
+)
+
+const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(
+  ({ onClick, replace = false, state, target, to, ...rest }, ref) => {
+    const href = useHref(to)
+    const handleClick = useLinkClickHandler(to, {
+      replace,
+      state,
+      target,
+    })
+
+    return (
+      <a
+        {...rest}
+        href={href}
+        onClick={(event) => {
+          onClick?.(event)
+          if (!event.defaultPrevented) {
+            handleClick(event)
+          }
+        }}
+        ref={ref}
+        target={target}
+      />
+    )
+  }
 )
 
 function Layout({ children }: { children: React.ReactNode }) {
